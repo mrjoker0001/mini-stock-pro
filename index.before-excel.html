@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini Stock Pro</title>
+<style>
+:root{font-family:Arial,sans-serif;color:#172033;background:#f3f6fb}
+*{box-sizing:border-box}
+body{margin:0}
+header{background:#14213d;color:white;padding:22px}
+header h1{margin:0;font-size:25px}
+header p{margin:7px 0 0;color:#cbd5e1}
+main{max-width:1100px;margin:auto;padding:20px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.card,section{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:17px;margin-bottom:16px}
+.stat-label{color:#64748b;font-size:13px}
+.stat-value{font-size:26px;font-weight:bold;margin-top:8px}
+h2{font-size:18px;margin:0 0 15px}
+form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+label{font-size:13px;color:#475569}
+input{display:block;width:100%;padding:12px;margin-top:6px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px}
+button{border:0;border-radius:8px;padding:12px 16px;background:#2563eb;color:white;font-size:14px;font-weight:bold;cursor:pointer}
+button:hover{opacity:.9}
+.full{grid-column:1/-1}
+.search{margin-bottom:14px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:650px}
+th,td{text-align:left;padding:12px;border-bottom:1px solid #e2e8f0;font-size:13px}
+th{background:#f8fafc;color:#475569}
+.small-btn{padding:7px 10px;background:#dc2626}
+.empty{text-align:center;color:#64748b;padding:25px}
+footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
+@media(max-width:560px){main{padding:12px}.stats{grid-template-columns:1fr}.stat-value{font-size:22px}form{grid-template-columns:1fr}.full{grid-column:auto}header{padding:18px}}
+</style>
+</head>
+<body>
+<header>
+<h1>Mini Stock Pro</h1>
+<p>Simple inventory management · Free prototype</p>
+</header>
+<main>
+<div class="stats">
+<div class="card"><div class="stat-label">Total Products</div><div class="stat-value" id="total">0</div></div>
+<div class="card"><div class="stat-label">Units in Stock</div><div class="stat-value" id="units">0</div></div>
+<div class="card"><div class="stat-label">Stock Cost Value</div><div class="stat-value" id="value">Rs 0</div></div>
+</div>
+<section>
+<h2>Add Product</h2>
+<form id="productForm">
+<label>Product Name<input id="name" required maxlength="100" placeholder="e.g. Cotton Thread"></label>
+<label>SKU / Product Code<input id="sku" maxlength="50" placeholder="e.g. TH-001"></label>
+<label>Purchase Price (Rs)<input id="purchase" type="number" min="0" step="0.01" required placeholder="0"></label>
+<label>Sale Price (Rs)<input id="sale" type="number" min="0" step="0.01" required placeholder="0"></label>
+<label>Quantity in Stock<input id="qty" type="number" min="0" step="1" required placeholder="0"></label>
+<label>Low Stock Alert<input id="minimum" type="number" min="0" step="1" value="5" required></label>
+<button class="full" type="submit">+ Add Product</button>
+</form>
+</section>
+<section>
+<h2>Inventory</h2>
+<input class="search" id="search" placeholder="Search by product name or SKU...">
+<div class="table-wrap">
+<table>
+<thead><tr><th>Product</th><th>SKU</th><th>Purchase</th><th>Sale</th><th>Stock</th><th>Status</th><th>Action</th></tr></thead>
+<tbody id="rows"></tbody>
+</table>
+</div>
+<div id="empty" class="empty">No products yet. Add your first product above.</div>
+</section>
+</main>
+<footer>Mini Stock Pro · Prototype 1.0 · Data saved in this browser</footer>
+<script>
+const KEY='mini-stock-pro-products-v1';
+let products=[];
+try{products=JSON.parse(localStorage.getItem(KEY)||'[]');if(!Array.isArray(products))products=[]}catch(e){products=[]}
+const el=id=>document.getElementById(id);
+const money=n=>'Rs '+Number(n).toLocaleString('en-PK',{maximumFractionDigits:2});
+function save(){localStorage.setItem(KEY,JSON.stringify(products))}
+function render(){
+const query=el('search').value.trim().toLowerCase();
+const shown=products.filter(p=>(p.name+' '+p.sku).toLowerCase().includes(query));
+el('total').textContent=products.length;
+el('units').textContent=products.reduce((s,p)=>s+p.qty,0).toLocaleString();
+el('value').textContent=money(products.reduce((s,p)=>s+p.purchase*p.qty,0));
+el('rows').innerHTML=shown.map(p=>`<tr><td>${escapeText(p.name)}</td><td>${escapeText(p.sku||'—')}</td><td>${money(p.purchase)}</td><td>${money(p.sale)}</td><td>${p.qty}</td><td>${p.qty<=p.minimum?'Low stock':'In stock'}</td><td><button class="small-btn" data-delete="${p.id}">Delete</button></td></tr>`).join('');
+el('empty').style.display=shown.length?'none':'block';
+if(query&&shown.length===0)el('empty').textContent='No matching products found.';
+else el('empty').textContent='No products yet. Add your first product above.';
+}
+function escapeText(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+el('productForm').addEventListener('submit',e=>{
+e.preventDefault();
+const name=el('name').value.trim(),sku=el('sku').value.trim();
+const purchase=Number(el('purchase').value),sale=Number(el('sale').value),qty=Number(el('qty').value),minimum=Number(el('minimum').value);
+if(!name||![purchase,sale,qty,minimum].every(Number.isFinite)||purchase<0||sale<0||qty<0||minimum<0)return alert('Please enter valid product details.');
+if(products.some(p=>sku&&p.sku.toLowerCase()===sku.toLowerCase()))return alert('This SKU already exists. Use a unique code.');
+products.push({id:Date.now().toString()+Math.random().toString(36).slice(2),name,sku,purchase,sale,qty,minimum});
+save();e.target.reset();el('minimum').value=5;render();
+});
+el('search').addEventListener('input',render);
+el('rows').addEventListener('click',e=>{
+const id=e.target.dataset.delete;if(!id)return;
+if(confirm('Delete this product?')){products=products.filter(p=>p.id!==id);save();render()}
+});
+render();
+</script>
+</body>
+</html>
